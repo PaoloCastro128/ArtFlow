@@ -1,4 +1,5 @@
 import abc
+import math
 import os
 import cv2
 import numpy as np
@@ -98,13 +99,20 @@ class Circle(Layer):
 class DynamicValue:
     def __init__(self, base_value):
         self.base_value = base_value
+        self.setter = None
         self.updaters = []
+
+    def add_setter(self, setter):
+        self.setter = setter
 
     def add_updater(self, updater):
         self.updaters.append(updater)
 
     def get(self, frame_count):
-        value = self.base_value
+        if self.setter:
+            value = self.setter(frame_count)
+        else:
+            value = self.base_value
         for updater in self.updaters:
             value = updater(value, frame_count)
         return value
@@ -113,8 +121,10 @@ class DynamicValue:
 def main():
     video = Video(OUTPUT_VIDEO, 20, SIZE)
     radius = DynamicValue(1)
-    radius.add_updater(lambda val, i: val + i*4)
-    circle = Circle(1000, 1000, radius, (120, 200, 20))
+    radius.add_updater(lambda val, frame_count: val + frame_count*4)
+    center_x = DynamicValue(500)
+    center_x.add_updater(lambda val, frame_count: val - 4 * math.cos(frame_count/3))
+    circle = Circle(center_x, 1000, radius, (120, 200, 20))
     video.add_layer(circle)
     video.render(length_seconds=5)
 
