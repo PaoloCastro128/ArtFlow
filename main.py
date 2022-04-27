@@ -2,6 +2,7 @@ import abc
 import math
 import os
 import cv2
+import vnoise
 import numpy as np
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
@@ -22,18 +23,11 @@ class Video:
         self.frames_per_second = frames_per_second
         self.video = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*file_format),
                                      self.frames_per_second, self.dimensions)
-        self.empty_frame = self._get_empty_frame_template(dimensions, background_color)
+        self.empty_frame = get_empty_frame_template(dimensions, background_color)
         self.layers = []
 
     def add_layer(self, layer):
         self.layers.append(layer)
-
-    @staticmethod
-    def _get_empty_frame_template(dimensions, background_color):
-        frame = np.zeros((dimensions[0], dimensions[1], 3), np.uint8)
-        if background_color != BLACK:
-            frame[:] = background_color
-        return frame
 
     def render_frame(self, frame_count):
         current_frame = self.empty_frame.copy()
@@ -100,6 +94,13 @@ class Circle(Layer):
         return base_frame
 
 
+def get_empty_frame_template(dimensions, background_color):
+    frame = np.zeros((dimensions[0], dimensions[1], 3), np.uint8)
+    if background_color != BLACK:
+        frame[:] = background_color
+    return frame
+
+
 class DynamicValue:
     def __init__(self, base_value):
         self.base_value = base_value
@@ -131,7 +132,7 @@ def make_circle(color, offset):
     return circle
 
 
-def main():
+def main2():
     video = Video(OUTPUT_VIDEO, 20, SIZE, background_color=WHITE)
 
     circle1 = make_circle((255, 255, 0), 0)
@@ -142,6 +143,29 @@ def main():
     video.add_layer(circle2)
     video.add_layer(circle3)
     video.render(length_seconds=8)
+
+
+class Perlin(Layer):
+    def __init__(self, speed):
+        super().__init__()
+        self.speed = speed
+        self.noise = vnoise.Noise()
+
+    def get_overlay(self, base_frame, frame_count):
+        width, height, _ = base_frame.shape
+        z = (frame_count+1) * self.speed
+        base_frame = get_empty_frame_template((width, height), (110, 2, 81))
+        noise_frame = self.noise.noise3(np.linspace(0, 20, width), np.linspace(0, 20, height), z, octaves=2)
+        noise_frame = np.swapaxes(np.array((noise_frame, noise_frame, noise_frame)), 0, 2)
+        noise_frame = np.swapaxes(noise_frame, 0, 1)/5 + 1
+        return (base_frame * noise_frame).astype(np.uint8)
+
+
+def main():
+    video = Video(OUTPUT_VIDEO, 20, (500, 500))
+
+    video.add_layer(Perlin(0.005))
+    video.render(length_seconds=2, verbose_frames=2)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,3 @@
 opencv-python~=4.5.5.64
 numpy~=1.21.6
-perlin-noise~=1.12
+vnoise~=0.1.0
